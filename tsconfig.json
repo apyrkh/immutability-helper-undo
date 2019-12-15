@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "declaration": true,
+    "module": "commonjs",
+    "lib": ["es6"],
+    "newLine": "LF",
+    "strict": true,
+    "target": "es6",
+
+    "baseUrl": ".",
+    "paths": { "undo-redo": ["."] }
+  },
+  "files": [
+    "index.ts"
+  ]
+}
