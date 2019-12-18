@@ -3,14 +3,14 @@ const update = require('immutability-helper');
 
 
 // $push
-function create$PushUndo(object, field, redoObject) {
-  const splice = [-redoObject.length, redoObject.length];
+function create$PushUndo(object, field, spec) {
+  const splice = [-spec.length, spec.length];
   return { [field]: { $splice: [splice] } };
 }
 
 // $unshift
-function create$UnshiftUndo(object, field, redoObject) {
-  const splice = [0, redoObject.length];
+function create$UnshiftUndo(object, field, spec) {
+  const splice = [0, spec.length];
   return { [field]: { $splice: [splice] } };
 }
 
@@ -24,12 +24,16 @@ function createSpliceUndoArgs(array, redoSpliceArgs) {
   return [i, insert.length, ...remove];
 }
 
-function create$SpliceUndo(object, field, redoObject) {
+function create$SpliceUndo(object, field, spec) {
   const $splice = [];
 
-  for (let i = redoObject.length - 1; i >= 0; i--) {
-    const stepArray = update(object[field], { $splice: redoObject.slice(0, i) });
-    const stepRedoSpliceArgs = redoObject[i];
+  for (let i = spec.length - 1; i >= 0; i--) {
+    const stepArray = spec.slice(0, i).reduce((res, spliceArgs) => {
+      res.splice(...spliceArgs);
+      return res;
+    }, object[field].slice());
+
+    const stepRedoSpliceArgs = spec[i];
 
     $splice.push(createSpliceUndoArgs(stepArray, stepRedoSpliceArgs));
   }
@@ -39,33 +43,34 @@ function create$SpliceUndo(object, field, redoObject) {
 
 
 // $set
-function create$SetUndo(object, field, redoObject) {
+function create$SetUndo(object, field, spec) {
   return object.hasOwnProperty(field) ? { [field]: { $set: object[field] } } : { $unset: [field] };
 }
 
 
 // $toggle
-function create$ToggleUndo(object, field, redoObject) {
-  const result = redoObject.reduce((res, key) => {
+function create$ToggleUndo(object, field, spec) {
+  return spec.reduce((res, key) => {
     if (object.hasOwnProperty(key)) {
+      if (!res.$toggle) {
+        res.$toggle = [];
+      }
       res.$toggle.push(key);
     } else {
+      if (!res.$unset) {
+        res.$unset = [];
+      }
       res.$unset.push(key);
     }
 
     return res;
-  }, { $toggle: [], $unset: [] });
-
-  if (!result.$toggle.length) delete result.$toggle;
-  if (!result.$unset.length) delete result.$unset;
-
-  return result;
+  }, {});
 }
 
 
 // $unset
-function create$UnsetUndo(object, field, redoObject) {
-  return redoObject.reduce((res, key) => {
+function create$UnsetUndo(object, field, spec) {
+  return spec.reduce((res, key) => {
     if (object.hasOwnProperty(key)) {
       res[key] = { $set: object[key] };
     }
@@ -74,78 +79,84 @@ function create$UnsetUndo(object, field, redoObject) {
 }
 
 
-// $merge
-function create$MergeUndo(object, field, redoObject) {
-  const fieldValue = object[field];
-  const result = Object.keys(redoObject).reduce((res, key) => {
-    if (fieldValue.hasOwnProperty(key)) {
-      res[key] = { $set: fieldValue[key] };
+// $mergef
+function create$MergeUndo(object, field, spec) {
+  const target = object[field];
+  const result = Object.keys(spec).reduce((res, key) => {
+    if (target.hasOwnProperty(key)) {
+      res[key] = { $set: target[key] };
     } else {
+      if (!res.$unset) {
+        res.$unset = [];
+      }
       res.$unset.push(key);
     }
 
     return res;
-  }, { $unset: [] });
+  }, {});
 
-  if (!result.$unset.length) delete result.$unset;
-
-  return { [field]: { ...result } };
+  return Object.keys(result) ? { [field]: { ...result } } : {};
 }
 
 
 // $apply
-function create$ApplyUndo(object, field, redoObject) {
+function create$ApplyUndo(object, field, spec) {
   return { [field]: { $set: object[field] } };
 }
 
 
 // $add
-function createAddToSetUndo(set, redoObject) {
-  const result = redoObject.reduce((res, item) => {
+function createAddToSetUndo(set, spec) {
+  return spec.reduce((res, item) => {
     if (!set.has(item)) {
+      if (!res.$remove) {
+        res.$remove = [];
+      }
       res.$remove.push(item);
     }
-
     return res;
-  }, { $remove: [] });
-
-  return result.$remove.length ? result : null;
+  }, {});
 }
 
-function createAddToMapUndo(map, redoObject) {
-  const result = redoObject.reduce((res, [key, value]) => {
+function createAddToMapUndo(map, spec) {
+  return spec.reduce((res, item) => {
+    const [key, value] = item;
     if (map.has(key)) {
+      if (!res.$add) {
+        res.$add = [];
+      }
       res.$add.push([key, map.get(key)]);
     } else {
+      if (!res.$remove) {
+        res.$remove = [];
+      }
       res.$remove.push(key);
     }
 
     return res;
-  }, { $add: [], $remove: [] });
-
-  if (!result.$add.length) delete result.$add;
-  if (!result.$remove.length) delete result.$remove;
-
-  return result.$add || result.$remove ? result : null;
+  }, {});
 }
 
-function create$AddUndo(object, field, redoObject) {
-  const undoObject = object[field] instanceof Set ? createAddToSetUndo(object[field], redoObject) : createAddToMapUndo(object[field], redoObject);
-  return undoObject ? { [field]: { ...undoObject } } : {};
+function create$AddUndo(object, field, spec) {
+  const undoObject = object[field] instanceof Set ? createAddToSetUndo(object[field], spec) : createAddToMapUndo(object[field], spec);
+  return Object.keys(undoObject).length ? { [field]: { ...undoObject } } : {};
 }
 
 
 // $remove
-function create$RemoveUndo(object, field, redoObject) {
-  const setOrMap = object[field];
-  const result = redoObject.reduce((res, keyOrValue) => {
-    if (setOrMap.has(keyOrValue)) {
-      res.$add.push(setOrMap instanceof Set ? keyOrValue : [keyOrValue, setOrMap.get(keyOrValue)]);
+function create$RemoveUndo(object, field, spec) {
+  const target = object[field];
+  const result = spec.reduce((res, keyOrValue) => {
+    if (target.has(keyOrValue)) {
+      if (!res.$add) {
+        res.$add = [];
+      }
+      res.$add.push(target instanceof Set ? keyOrValue : [keyOrValue, target.get(keyOrValue)]);
     }
     return res;
-  }, { $add: [] });
+  }, {});
 
-  return result.$add.length ? { [field]: result } : {};
+  return result.$add ? { [field]: result } : {};
 }
 
 
