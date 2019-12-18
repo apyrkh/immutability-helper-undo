@@ -4,3 +4,6 @@ node_modules/
 *.iml
 *.ipr
 *.iws
+
+*.d.ts
+index.js

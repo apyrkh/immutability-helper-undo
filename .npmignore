@@ -1,2 +1,6 @@
 .idea/
 .gitignore
+*.ts
+!*.d.ts
+smoke-test.js
+tsconfig.json

@@ -1,5 +1,6 @@
 const deepEql = require('deep-eql');
 const update = require('immutability-helper');
+const { undoCommands } = require('./index');
 
 
 // $push
@@ -222,16 +223,19 @@ function smartMergeObjects(objects) {
 }
 
 const undoObjects = [
-  create$RemoveUndo(initialState, 'remove1', redoObject.remove1.$remove), create$RemoveUndo(initialState, 'remove2', redoObject.remove2.$remove),
-  create$AddUndo(initialState, 'add1', redoObject.add1.$add), create$AddUndo(initialState, 'add2', redoObject.add2.$add),
-  create$ApplyUndo(initialState, 'apply', redoObject.apply.$apply),
-  create$MergeUndo(initialState, 'merge', redoObject.merge.$merge),
-  create$UnsetUndo(initialState, undefined, redoObject.$unset),
-  create$ToggleUndo(initialState, undefined, redoObject.$toggle),
-  create$SetUndo(initialState, 'set2', redoObject.set2.$set), create$SetUndo(initialState, 'set', redoObject.set.$set),
-  create$SpliceUndo(initialState, 'splice', redoObject.splice.$splice),
-  create$UnshiftUndo(initialState, 'unshift', redoObject.unshift.$unshift),
-  create$PushUndo(initialState, 'push', redoObject.push.$push),
+  undoCommands['$remove'](initialState, 'remove1', redoObject.remove1.$remove),
+  undoCommands['$remove'](initialState, 'remove2', redoObject.remove2.$remove),
+  undoCommands['$add'](initialState, 'add1', redoObject.add1.$add),
+  undoCommands['$add'](initialState, 'add2', redoObject.add2.$add),
+  undoCommands['$apply'](initialState, 'apply', redoObject.apply.$apply),
+  undoCommands['$merge'](initialState, 'merge', redoObject.merge.$merge),
+  undoCommands['$unset'](initialState, undefined, redoObject.$unset),
+  undoCommands['$toggle'](initialState, undefined, redoObject.$toggle),
+  undoCommands['$set'](initialState, 'set2', redoObject.set2.$set),
+  undoCommands['$set'](initialState, 'set', redoObject.set.$set),
+  undoCommands['$splice'](initialState, 'splice', redoObject.splice.$splice),
+  undoCommands['$unshift'](initialState, 'unshift', redoObject.unshift.$unshift),
+  undoCommands['$push'](initialState, 'push', redoObject.push.$push),
 ];
 
 const undoObject = smartMergeObjects(undoObjects);
