@@ -8,9 +8,9 @@
     "prebuild": "rimraf index.js *.d.ts",
     "build": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "presmoke-test": "npm run build && rimraf smoke-test",
+    "presmoke-test": "npm run build",
     "smoke-test": "node smoke-test.js",
-    "postsmoke-test": "rimraf smoke-test index.js"
+    "postsmoke-test": "rimraf index.js index.d.ts"
   },
   "keywords": [],
   "author": "",
